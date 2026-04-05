@@ -1,6 +1,6 @@
 # 🎬 YouTube Educational Course Scraper
 
-A Laravel-based web application that discovers educational YouTube playlists (courses) using **AI-generated search queries** (Anthropic Claude) and displays them in a clean, RTL Arabic UI.
+A Laravel-based web application that discovers educational YouTube playlists (courses) using **AI-generated search queries** (Google Gemini) and displays them in a clean, RTL Arabic UI.
 
 ---
 
@@ -11,6 +11,8 @@ The UI matches the provided design:
 - **Red-accented filter tabs** per category
 - **Course card grid** showing thumbnail, title, channel, and video count
 - **Arabic RTL layout** using Cairo font + Bootstrap 5 RTL
+
+🎥 **Demo:** [see Demo Here](https://drive.google.com/file/d/1DjnFY8L_-Y1rhY0lkHEwL2DCG2ff_IFF/view?usp=sharing)
 
 ---
 
@@ -25,8 +27,8 @@ CourseController::fetch()
        ▼
 CourseFetcherService::run()
        │
-       ├──► AnthropicService::generateCourseTitles(category)
-       │           └── Calls Claude API → returns 15 search queries
+       ├──► GeminiService::generateCourseTitles(category)
+       │           └── Calls Gemini API → returns 10 search queries
        │
        └──► YouTubeService::searchPlaylists(query, limit=2)
                    ├── search.list  → finds 2 playlists per query
@@ -79,9 +81,9 @@ DB_DATABASE=youtube_scraper
 DB_USERNAME=root
 DB_PASSWORD=your_password
 
-# ── Anthropic Claude API ───────────────────────────────────────
-# Get yours at: https://console.anthropic.com/
-ANTHROPIC_API_KEY=sk-ant-api03-...
+# ── Google Gemini API ─────────────────────────────────────────
+# Get yours at: https://aistudio.google.com/
+GEMINI_API_KEY=AIza...
 
 # ── YouTube Data API v3 ────────────────────────────────────────
 # Get yours at: https://console.cloud.google.com/
@@ -121,12 +123,12 @@ Visit: **http://localhost:8000**
 
 ## 🔑 API Keys Configuration
 
-### Anthropic Claude API
-1. Go to [https://console.anthropic.com/](https://console.anthropic.com/)
-2. Create an account and navigate to **API Keys**
-3. Create a new key and copy it to `ANTHROPIC_API_KEY`
+### Google Gemini API
+1. Go to [https://aistudio.google.com/](https://aistudio.google.com/)
+2. Click **Get API Key**
+3. Create a new key and copy it to `GEMINI_API_KEY`
 
-> **Model used:** `claude-3-haiku-20240307` — fast and cost-effective for batch generation
+> **Model used:** `gemini-2.5-flash` — fast and cost-effective for batch generation
 
 ### YouTube Data API v3
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
@@ -135,7 +137,7 @@ Visit: **http://localhost:8000**
 4. Create credentials → **API Key**
 5. Copy the key to `YOUTUBE_API_KEY`
 
-> **Quota note:** Each search costs 100 units. With 15 queries × N categories, budget accordingly. Default daily quota is 10,000 units.
+> **Quota note:** Each search costs 100 units. With 10 queries × N categories, budget accordingly. Default daily quota is 10,000 units.
 
 ---
 
@@ -149,7 +151,7 @@ app/
 │   ├── Course.php                 # Eloquent model with deduplication scope
 │   └── FetchJob.php               # Tracks each fetch session + log
 ├── Services/
-│   ├── AnthropicService.php       # Calls Claude API → generates search queries
+│   ├── GeminiService.php          # Calls Gemini API → generates search queries
 │   ├── YouTubeService.php         # Calls YouTube API → finds playlists
 │   └── CourseFetcherService.php   # Orchestrates the full pipeline
 ├── Providers/
@@ -245,9 +247,9 @@ This two-layer approach means:
 
 1. **Synchronous pipeline** — `QUEUE_CONNECTION=sync` runs the pipeline in the same HTTP request. For production, convert `CourseFetcherService::run()` into a queued `Job` and dispatch it. Add a polling endpoint to stream status to the frontend.
 
-2. **Claude Haiku** — Chosen for speed and cost. Upgrade to `claude-3-5-sonnet-20241022` for higher-quality title generation if needed.
+2. **Gemini 2.5 Flash** — Chosen for speed and cost. Upgrade to `gemini-2.5-pro` for higher-quality title generation if needed.
 
-3. **2 playlists per query** — Matches the spec and conserves YouTube API quota (100 units/search × 15 queries × N categories).
+3. **2 playlists per query** — Matches the spec and conserves YouTube API quota (100 units/search × 10 queries × N categories).
 
 4. **FetchJob log** — Every step (saved, skipped, error) is written to `fetch_jobs.log` as a JSON array. View it at `/jobs/{id}`.
 
@@ -256,12 +258,10 @@ This two-layer approach means:
 ## 🧪 Testing the APIs manually
 
 ```bash
-# Test Anthropic
-curl https://api.anthropic.com/v1/messages \
-  -H "x-api-key: $ANTHROPIC_API_KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
-  -d '{"model":"claude-3-haiku-20240307","max_tokens":100,"messages":[{"role":"user","content":"Say hello"}]}'
+# Test Gemini
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Say hello"}]}]}'
 
 # Test YouTube
 curl "https://www.googleapis.com/youtube/v3/search?part=snippet&q=python+course&type=playlist&maxResults=2&key=$YOUTUBE_API_KEY"
